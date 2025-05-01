@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DBD Bingo</title>
+  <style>
+    @font-face {
+      font-family: 'GridFont';
+      src: url('Assets/Grid.ttf');
+    }
+    @font-face {
+      font-family: 'TitleFont';
+      src: url('Assets/Title.ttf');
+    }
+    @font-face {
+      font-family: 'UIFont';
+      src: url('Assets/UI.ttf');
+    }
+
+    body {
+      background-color: #0b0b0b;
+      margin: 0;
+      font-family: 'UIFont', sans-serif;
+      color: white;
+      text-align: center;
+    }
+
+    #setup {
+      margin-top: 60px;
+    }
+
+    #setup input, #setup select, #setup button {
+      font-family: 'UIFont', sans-serif;
+      font-size: 1rem;
+      padding: 8px;
+      margin: 10px;
+    }
+
+    .bingo-title {
+      font-family: 'TitleFont';
+      font-size: 6rem;
+      color: #FFCC00;
+      text-shadow:
+        -1px -1px 0 #800000,
+        1px -1px 0 #800000,
+        -1px 1px 0 #800000,
+        1px 1px 0 #800000,
+        0 0 10px #FFA500,
+        0 0 20px #FF4500;
+      animation: flicker 2s infinite alternate;
+      margin-bottom: 20px;
+      max-width: 90vw;
+      word-wrap: break-word;
+    }
+
+    @keyframes flicker {
+      from { text-shadow: 0 0 10px #FFA500, 0 0 20px #FF4500; }
+      to { text-shadow: 0 0 15px #FF8C00, 0 0 30px #FF0000; }
+    }
+
+    #bingo-container {
+      margin: 0 auto;
+      width: fit-content;
+      background: url('Assets/blood splatter background.jpg') no-repeat center center;
+      background-size: cover;
+      padding: 40px;
+    }
+
+    #bingo {
+      display: grid;
+      grid-template-columns: repeat(5, 120px);
+      gap: 6px;
+      justify-content: center;
+    }
+
+    .cell {
+      width: 120px;
+      height: 120px;
+      background-color: rgba(0, 0, 0, 0.6);
+      border: 2px solid #333;
+      font-family: 'GridFont', sans-serif;
+      font-size: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+      color: white;
+      text-align: center;
+    }
+
+    .splatter {
+      display: none;
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      width: 110px;
+      height: 110px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .cell.stamped .splatter {
+      display: block;
+    }
+
+    .cell-text {
+      z-index: 2;
+    }
+
+    .tagline {
+      font-size: 0.9rem;
+      margin-top: 20px;
+      color: #999;
+    }
+
+    #startOver {
+      font-family: 'UIFont';
+      padding: 10px 20px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="setup">
+    <input type="text" id="customTitle" placeholder="Enter your title..." />
+    <select id="mode">
+      <option value="killers">Killers</option>
+      <option value="survivors">Survivors</option>
+      <option value="killerActions">Killer Actions</option>
+      <option value="survivorActions">Survivor Actions</option>
+      <option value="chaos">Chaos Mode</option>
+    </select>
+    <button onclick="startGame()">Start Game</button>
+  </div>
+
+  <div id="bingo-container" style="display:none;">
+    <div id="title" class="bingo-title"></div>
+    <div id="bingo"></div>
+    <button id="startOver" onclick="location.reload()">Start Over</button>
+    <div class="tagline">Created by @LadyGamerAdventures | 2025</div>
+  </div>
+
+  <audio id="stampSound" src="Assets/stamp.ogg" preload="auto"></audio>
+  <audio id="bingoSound" src="Assets/bingo.mp3" preload="auto"></audio>
+
+  <script>
+    const pools = {
+      killers: ["Trapper", "Wraith", "Hillbilly", "Nurse", "Hag", "Shape", "Doctor", "Huntress", "Cannibal", "Nightmare", "Pig", "Clown", "Spirit", "Legion", "Plague", "Ghost Face", "Demogorgon", "Oni", "Deathslinger", "Blight", "Twins", "Trickster", "Nemesis", "Cenobite", "Artist", "Onry\u014d", "Dredge", "Mastermind", "Knight", "Skull Merchant", "Singularity", "Xenomorph", "Good Guy", "Unknown"],
+      survivors: ["Dwight Fairfield", "Meg Thomas", "Claudette Morel", "Jake Park", "Nea Karlsson", "Laurie Strode", "Ace Visconti", "William 'Bill' Overbeck", "Feng Min", "David King", "Quentin Smith", "Detective David Tapp", "Kate Denson", "Adam Francis", "Jeff Johansen", "Jane Romero", "Ash Williams", "Nancy Wheeler", "Steve Harrington", "Yui Kimura", "Zarina Kassir", "Cheryl Mason", "Felix Richter", "\u00c9lodie Rakoto", "Yun-Jin Lee", "Jill Valentine", "Leon S. Kennedy", "Mikaela Reid", "Jonah Vasquez", "Yoichi Asakawa", "Haddie Kaur", "Ada Wong", "Rebecca Chambers", "Vittorio Toscano", "Thalita Lyra", "Renato Lyra", "Gabriel Soma", "Ellen Ripley", "Nicolas Cage", "Alan Wake"],
+      killerActions: ["Hook someone in the basement", "Break a door", "Kick 2 gens", "Snuff a boon once", "Interrupt a vault", "Hit air near survivor (playful swipe)", "Let last survivor escape", "Bring survivors to totem and nod", "Hit 2 survivors within 10 sec", "Close hatch in front of survivor", "Force 2 off gens", "Pop Goes the Weasel activates", "Hex: Ruin active 2+ gens", "Hex: NOED triggers", "Down survivor mid-pallet", "Hook obsession 3x", "2 hooks in 60 sec", "Devour Hope stack used", "Snuff 3 boons", "Get a grab from gen/totem", "Get value from slowdown perk", "Get a 4K", "Chase survivor 60+ seconds", "Mori 1 survivor", "Mori 2 survivors", "Mori all 4 survivors", "Down 2 while slugging", "Down survivor mid-vault", "Backward chase", "Down before pallet drop", "Down with power x2", "Stop gen at 99%", "Activate Scourge Hook"],
+      survivorActions: ["Pet the killer (boop)", "T-bag (friendly)", "Gift item to killer", "Dance party at gate", "Get healed mid-chase", "Escape via exit gate", "Heal a teammate", "Hide in locker successfully", "Drop Chem Trap successfully", "Escape matching cosmetics", "Halloween gen squad", "Stun killer after injury", "Cleanse a dull totem", "Loop killer for 30+ seconds", "Blind the killer", "Fake a vault successfully", "Flashlight save", "Sabotage a hook before use", "Complete a gen solo", "Dead Hard used successfully", "Take a protection hit", "Fast vault twice in chase", "Escape through hatch", "Trigger Hex perk", "Finish the last gen", "Deliverance activation", "Hit Decisive Strike", "Unhook someone safely", "Avoid detection in chase", "Use full med-kit", "Stun killer with a pallet", "Stealth avoid detection while injured"],
+      chaos: ["Hook someone in the basement", "Break a door", "Kick 2 gens", "Snuff a boon once", "Interrupt a vault", "Hit air near survivor (playful swipe)", "Let last survivor escape", "Bring survivors to totem and nod", "Hit 2 survivors within 10 sec", "Close hatch in front of survivor", "Force 2 off gens", "Pop Goes the Weasel activates", "Hex: Ruin active 2+ gens", "Hex: NOED triggers", "Down survivor mid-pallet", "Hook obsession 3x", "2 hooks in 60 sec", "Devour Hope stack used", "Snuff 3 boons", "Get a grab from gen/totem", "Get value from slowdown perk", "Get a 4K", "Chase survivor 60+ seconds", "Mori 1 survivor", "Mori 2 survivors", "Mori all 4 survivors", "Down 2 while slugging", "Down survivor mid-vault", "Backward chase", "Down before pallet drop", "Down with power x2", "Stop gen at 99%", "Activate Scourge Hook", "Pet the killer (boop)", "T-bag (friendly)", "Gift item to killer", "Dance party at gate", "Get healed mid-chase", "Escape via exit gate", "Heal a teammate", "Hide in locker successfully", "Drop Chem Trap successfully", "Escape matching cosmetics", "Halloween gen squad", "Stun killer after injury", "Cleanse a dull totem", "Loop killer for 30+ seconds", "Blind the killer", "Fake a vault successfully", "Flashlight save", "Sabotage a hook before use", "Complete a gen solo", "Dead Hard used successfully", "Take a protection hit", "Fast vault twice in chase", "Escape through hatch", "Trigger Hex perk", "Finish the last gen", "Deliverance activation", "Hit Decisive Strike", "Unhook someone safely", "Avoid detection in chase", "Use full med-kit", "Stun killer with a pallet", "Stealth avoid detection while injured"]
+    };
+
+    function shuffle(array) {
+      return array.sort(() => Math.random() - 0.5);
+    }
+
+    function startGame() {
+      const titleText = document.getElementById("customTitle").value || "DBD Bingo";
+      const mode = document.getElementById("mode").value;
+      const pool = shuffle([...pools[mode]]).slice(0, 25);
+      pool[12] = "FREE SPACE";
+
+      document.getElementById("setup").style.display = "none";
+      document.getElementById("bingo-container").style.display = "block";
+      document.getElementById("title").textContent = titleText;
+
+      const bingo = document.getElementById("bingo");
+      bingo.innerHTML = "";
+
+      for (let i = 0; i < 25; i++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.innerHTML = `<span class="cell-text">${pool[i]}</span><img class="splatter" src="Assets/blood splatter frame.png">`;
+        if (i === 12) cell.classList.add("stamped");
+
+        cell.addEventListener("click", () => {
+          cell.classList.toggle("stamped");
+          document.getElementById("stampSound").play();
+          checkForBingo();
+        });
+
+        bingo.appendChild(cell);
+      }
+    }
+
+    let bingoTriggered = false;
+function checkForBingo() {
+      const cells = document.querySelectorAll(".cell");
+      const wins = [
+        [0,1,2,3,4], [5,6,7,8,9], [10,11,12,13,14], [15,16,17,18,19], [20,21,22,23,24],
+        [0,5,10,15,20], [1,6,11,16,21], [2,7,12,17,22], [3,8,13,18,23], [4,9,14,19,24],
+        [0,6,12,18,24], [4,8,12,16,20]
+      ];
+      for (let line of wins) {
+        if (line.every(i => cells[i].classList.contains("stamped")) && !bingoTriggered) {
+          const bingoSound = document.getElementById("bingoSound");
+          bingoSound.currentTime = 0;
+          bingoTriggered = true;
+          bingoSound.play();
+          setTimeout(() => bingoSound.pause(), 5000); // Limit sound to 5 seconds
+        }
+      }
+    }
+  </script>
+</body>
+</html>
